@@ -133,6 +133,8 @@
   button.sm{padding:6px 12px;font-size:13px;border-radius:10px}
   button.ghost{border:0;background:none;color:var(--mut);cursor:pointer;font-size:20px;line-height:1;padding:8px;border-radius:10px}
   button.ghost:hover{background:var(--errbg);color:var(--err)}
+  .spin{width:15px;height:15px;border-radius:50%;border:2px solid currentColor;border-top-color:transparent;animation:putar .7s linear infinite}
+  button.loading:disabled{opacity:.9;cursor:progress}
   button:disabled{opacity:.45;cursor:not-allowed;transform:none!important;box-shadow:none!important}
   button:focus-visible{outline:none;box-shadow:0 0 0 4px var(--ring)}
   .actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:8px;align-items:center}
@@ -271,7 +273,8 @@
 </header>
 <nav class="dock"><div class="wrap"><div id="tabs"></div></div></nav>
 <main id="app"><div class="card"><div class="skel w40"></div><div class="skel"></div><div class="skel w80"></div></div></main>
-<footer>SIPANDA · Dinas Energi dan Sumber Daya Mineral Provinsi Jawa Timur · Prototipe</footer>
+
+<footer>SIPANDA · Sekretariat - Subbagian Umum Dan Kepegawaian · Dinas ESDM Provinsi Jawa Timur</footer>
 
 <div id="kal" class="hidden"></div>
 <div id="toast" role="status" aria-live="polite"></div>
@@ -432,7 +435,14 @@ function tampilNip() {
     : st.s === 'salah' ? '<span class="chip err">' + esc(st.pesan) + '</span>' : esc(st.pesan);
   perbaruiTombol();
 }
-function perbaruiTombol() { const b = $('#kirim'); if (b) b.disabled = !(state.nipStatus.s === 'ok' && state.id.bidang); }
+function perbaruiTombol() {
+  const b = $('#kirim'); if (!b) return;
+  const alasan = state.nipStatus.s !== 'ok' ? 'Isi NIP yang terdaftar.'
+    : !state.id.bidang ? 'Pilih bidang / divisi.'
+    : state.rows.some(r => !r.pilih) ? 'Pilih jenis dokumen di semua baris.' : '';
+  b.disabled = !!alasan;
+  const p = $('#petunjuk'); if (p) p.textContent = alasan;
+}
 function setBidang(v) { state.id.bidang = v; if (state.nipStatus.s === 'ok') simpanId(); perbaruiTombol(); }
 
 // ---------- modal ----------
@@ -477,13 +487,13 @@ function tanggalAwal() {
 }
 function barisBaru(dari) {
   const c = state.ctx;
-  return { tanggal: dari ? dari.tanggal : tanggalAwal(), pilih: dari ? dari.pilih : 'J|' + (c.ref.jenis[0] || ''), jumlah: 1, keperluan: '' };
+  return { tanggal: dari ? dari.tanggal : tanggalAwal(), pilih: dari ? dari.pilih : '', jumlah: 1, keperluan: '' };
 }
 function opsiJenis(pilih) {
   const r = state.ctx.ref;
   const j = r.jenis.map(x => '<option value="J|' + esc(x) + '"' + (pilih === 'J|' + x ? ' selected' : '') + '>' + esc(x) + '</option>').join('');
   const p = r.paket.map(x => '<option value="P|' + esc(x.nama) + '"' + (pilih === 'P|' + x.nama ? ' selected' : '') + '>' + esc(x.nama) + ' (' + esc(x.isi.join(' + ')) + ')</option>').join('');
-  return '<optgroup label="Jenis dokumen">' + j + '</optgroup>' + (p ? '<optgroup label="Paket (beberapa nomor sekaligus)">' + p + '</optgroup>' : '');
+  return '<option value="">— pilih —</option><optgroup label="Jenis dokumen">' + j + '</optgroup>' + (p ? '<optgroup label="Paket (beberapa nomor sekaligus)">' + p + '</optgroup>' : '');
 }
 function opsiBidang(pilih) {
   return '<option value="">— pilih —</option>' + state.ctx.ref.bidang.map(b => '<option' + (b === pilih ? ' selected' : '') + '>' + esc(b) + '</option>').join('');
@@ -503,7 +513,7 @@ function rAmbil() {
     '<div class="card"><div class="card-h"><span class="step">2</span><div><h2>Ambil nomor surat</h2><p class="hint">Tanggal mundur boleh kapan saja, ke depan sampai ' + tgl(c.akhirBulan) + '. Maksimal ' + c.batas.perKirim + ' nomor per pengiriman dan ' + c.batas.perHari + ' nomor per hari per NIP.</p></div></div>' +
     err(state.err) + '<div id="rows"></div>' +
     '<div class="actions"><button class="btn" onclick="tambahBaris()"><span aria-hidden="true">+</span> Tambah baris</button>' +
-    '<button class="btn pri" id="kirim" onclick="kirim()">Ambil nomor</button></div></div>';
+    '<button class="btn pri" id="kirim" onclick="kirim()">Ambil nomor</button><span class="mut" id="petunjuk" role="status"></span></div></div>';
   gambarBaris();
   tampilNip();
 }
@@ -523,8 +533,9 @@ function gambarBaris() {
       '<div class="wide"><label class="lbl">Keperluan</label><input type="text" aria-label="Keperluan" maxlength="300" placeholder="mis. SPJ mamin rapat koordinasi" value="' + esc(r.keperluan) + '" oninput="setRow(' + i + ',\'keperluan\',this.value)"></div>' +
       '<div><button class="ghost" title="Hapus baris" aria-label="Hapus baris" onclick="hapusBaris(' + i + ')">×</button></div></div>';
   }).join('');
+  perbaruiTombol();
 }
-function setRow(i, k, v) { state.rows[i][k] = v; }
+function setRow(i, k, v) { state.rows[i][k] = v; if (k === 'pilih') perbaruiTombol(); }
 // Tambah baris tepat di bawah baris i dengan tanggal (dan jenis) yang sama, fokus ke kolom keperluan.
 function tambahDiTanggal(i) {
   state.rows.splice(i + 1, 0, barisBaru(state.rows[i]));
@@ -539,6 +550,7 @@ async function kirim() {
     ? { tanggal: r.tanggal, paket: r.pilih.slice(2), keperluan: r.keperluan }
     : { tanggal: r.tanggal, jenis: r.pilih.slice(2), jumlah: r.jumlah, keperluan: r.keperluan });
   if (state.nipStatus.s !== 'ok') { state.err = 'Isi NIP yang terdaftar terlebih dahulu.'; rAmbil(); return; }
+  if (state.rows.some(r => !r.pilih)) { state.err = 'Pilih jenis dokumen di semua baris.'; rAmbil(); return; }
   $('#kirim').disabled = true; $('#kirim').textContent = 'Memproses…';
   try {
     const r = await call('api_ambil', { nip: digits(state.id.nip), bidang: state.id.bidang, web: ($('#web') || {}).value || '', items });
@@ -621,7 +633,7 @@ function rAdmin() {
   if (!state.token) {
     $('#app').innerHTML = '<div class="card login"><span class="ico">' + svg(IKON.kunci, 24) + '</span><h2>Masuk admin</h2><p class="mut sub">Khusus pengelola nomor surat.</p>' + err(state.err) +
       '<label for="aNama">Username</label><input id="aNama" maxlength="60" autocomplete="username" autocapitalize="off" value="' + esc(state.adminNama) + '"><label for="aKode" style="margin-top:10px">Password</label>' +
-      '<input id="aKode" type="password" autocomplete="current-password" onkeydown="if(event.key===\'Enter\')masukAdmin()"><div class="actions" style="margin-top:14px"><button class="btn pri" style="width:100%" onclick="masukAdmin()">Masuk</button></div></div>';
+      '<input id="aKode" type="password" autocomplete="current-password" onkeydown="if(event.key===\'Enter\')masukAdmin()"><div class="actions" style="margin-top:14px"><button class="btn pri" id="aMasuk" style="width:100%" onclick="masukAdmin()">Masuk</button></div></div>';
     return;
   }
   const m = [['dasbor', 'Dasbor'], ['blok', 'Atur blok'], ['kelola', 'Batal & alih']];
@@ -630,7 +642,10 @@ function rAdmin() {
   ({ dasbor: rDasbor, blok: rBlok, kelola: rKelola })[state.adminMenu]();
 }
 async function masukAdmin() {
+  const b = $('#aMasuk'); if (!b || b.disabled) return;
   state.adminNama = $('#aNama').value;
+  b.disabled = true; b.classList.add('loading'); b.innerHTML = '<span class="spin"></span>Memeriksa…';
+  $('#aNama').disabled = true; $('#aKode').disabled = true;
   try { const r = await call('api_adminLogin', $('#aKode').value, state.adminNama); state.token = r.token; state.adminNama = r.nama; state.err = ''; }
   catch (e) { state.err = pesan(e); }
   rAdmin();
