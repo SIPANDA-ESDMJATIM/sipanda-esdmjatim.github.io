@@ -299,18 +299,38 @@ const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp
 // Di Apps Script: google.script.run. Di GitHub Pages (API_URL diisi oleh dev/bangun.py): fetch ke doPost.
 // text/plain sengaja dipakai agar browser tidak mengirim preflight CORS (Apps Script tidak menangani OPTIONS).
 const API_URL = 'https://script.google.com/macros/s/AKfycbxh74aLt99slHYrKZnPlfSUthafLQvckEisJbZv2W5szhM6Z1KDdrniWj4ZuE2eMPa4/exec';
+// Panggilan yang aman diulang otomatis (hanya membaca / login). Panggilan tulis TIDAK diulang: Google kadang
+// menjalankan skrip tetapi jawabannya hilang, sehingga mengulang bisa membuat nomor ganda.
+const BACA_SAJA = ['api_konteks', 'api_cekNip', 'api_nomorSaya', 'api_cari', 'api_adminLogin', 'api_adminDashboard', 'api_adminPermintaanBatal'];
+const tunggu = ms => new Promise(r => setTimeout(r, ms));
+async function panggilApi(fn, args) {
+  const aman = BACA_SAJA.indexOf(fn) >= 0;
+  for (let n = 0; ; n++) {
+    let teks;
+    const kendali = new AbortController(), batas = setTimeout(() => kendali.abort(), 30000);
+    try {
+      teks = await (await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ fn: fn, args: args }), signal: kendali.signal })).text();
+    } catch (e) {
+      if (aman && n < 2) { await tunggu(700 * (n + 1)); continue; }
+      throw new Error(aman ? 'Tidak bisa terhubung ke server. Periksa koneksi internet lalu coba lagi.'
+        : 'Jawaban server tidak diterima. Permintaan Anda MUNGKIN sudah tercatat: periksa dulu di tab "Nomor saya" sebelum mengirim ulang.');
+    } finally { clearTimeout(batas); }
+    let j;
+    try { j = JSON.parse(teks); } catch (e) {
+      if (aman && n < 2) { await tunggu(700 * (n + 1)); continue; }
+      throw new Error(aman ? 'Server belum menjawab dengan benar (Google mengembalikan halaman galat). Coba lagi sebentar lagi; bila berulang, hubungi admin.'
+        : 'Server tidak mengirim jawaban. Permintaan Anda MUNGKIN sudah tercatat: periksa dulu di tab "Nomor saya" sebelum mengirim ulang.');
+    }
+    if (!j || !j.ok) throw new Error((j && j.error) || 'Respons server tidak dikenali.');
+    return j.data;
+  }
+}
 const call = (fn, ...args) => {
   if (window.google && google.script && google.script.run) {
     return new Promise((ok, ng) => google.script.run.withSuccessHandler(ok).withFailureHandler(ng)[fn](...args));
   }
   if (!API_URL) return Promise.reject(new Error('Alamat server (API_URL) belum diatur.'));
-  return fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ fn: fn, args: args }) })
-    .then(r => r.text(), () => { throw new Error('Tidak bisa terhubung ke server. Periksa koneksi internet lalu coba lagi.'); })
-    .then(t => {
-      let j; try { j = JSON.parse(t); } catch (e) { throw new Error('Server belum menjawab dengan benar (Google mengembalikan halaman galat). Coba lagi sebentar lagi; bila berulang, hubungi admin.'); }
-      if (!j || !j.ok) throw new Error((j && j.error) || 'Respons server tidak dikenali.');
-      return j.data;
-    });
+  return panggilApi(fn, args);
 };
 const pesan = e => String((e && e.message) || e).replace(/^(Error|Exception):\s*/, '');
 const state = { ctx: null, tab: 'ambil', rows: [], hasil: null, err: '', id: { nip: '', bidang: '' },
@@ -655,7 +675,7 @@ async function masukAdmin() {
   state.adminNama = $('#aNama').value;
   b.disabled = true; b.classList.add('loading'); b.innerHTML = '<span class="spin"></span>Memeriksa…';
   $('#aNama').disabled = true; $('#aKode').disabled = true;
-  try { const r = await call('api_adminLogin', $('#aKode').value, state.adminNama); state.token = r.token; state.adminNama = r.nama; state.err = ''; }
+  try { const r = await call('api_adminLogin', state.adminNama, $('#aKode').value); state.token = r.token; state.adminNama = r.nama; state.err = ''; }
   catch (e) { state.err = pesan(e); }
   rAdmin();
 }
