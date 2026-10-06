@@ -4,7 +4,6 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#0e305d">
-<meta http-equiv="refresh" content="0; url=https://script.google.com/macros/s/AKfycbxh74aLt99slHYrKZnPlfSUthafLQvckEisJbZv2W5szhM6Z1KDdrniWj4ZuE2eMPa4/exec">
 <title>SIPANDA · Nomor Surat Pengadaan</title>
 <link rel="icon" href="aset/favicon.ico" sizes="any">
 <link rel="icon" type="image/png" sizes="32x32" href="aset/favicon-32.png">
@@ -18,6 +17,7 @@
   p{margin:0;color:var(--mut)}
   a{color:var(--pri);font-weight:600}
 </style>
+<noscript><meta http-equiv="refresh" content="0; url=https://script.google.com/macros/s/AKfycbxh74aLt99slHYrKZnPlfSUthafLQvckEisJbZv2W5szhM6Z1KDdrniWj4ZuE2eMPa4/exec"></noscript>
 </head>
 <body>
 <main>
@@ -26,6 +26,14 @@
   <p>Mengalihkan ke aplikasi&hellip;</p>
   <p style="margin-top:12px">Jika tidak berpindah otomatis, <a href="https://script.google.com/macros/s/AKfycbxh74aLt99slHYrKZnPlfSUthafLQvckEisJbZv2W5szhM6Z1KDdrniWj4ZuE2eMPa4/exec">klik di sini</a>.</p>
 </main>
-<script>location.replace("https://script.google.com/macros/s/AKfycbxh74aLt99slHYrKZnPlfSUthafLQvckEisJbZv2W5szhM6Z1KDdrniWj4ZuE2eMPa4/exec");</script>
+<script>
+(function(){
+  var u="https://script.google.com/macros/s/AKfycbxh74aLt99slHYrKZnPlfSUthafLQvckEisJbZv2W5szhM6Z1KDdrniWj4ZuE2eMPa4/exec",go=function(){location.replace(u)},done=false,
+  once=function(){if(!done){done=true;setTimeout(go,300)}},
+  img=document.querySelector("img");
+  if(img.complete)once();else{img.addEventListener("load",once);img.addEventListener("error",once)}
+  setTimeout(once,1500);
+})();
+</script>
 </body>
 </html>
